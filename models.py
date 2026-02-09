@@ -30,5 +30,5 @@ class Goal(Base):
     status = Column(String, default="planned")  # planned | in_progress | achieved
     created_at = Column(DateTime, default=datetime.utcnow)
 
-class PasswordCheck(BaseModel):
+class PasswordCheck(Base):
     password: str
