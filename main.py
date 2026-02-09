@@ -2,12 +2,12 @@ from fastapi import FastAPI, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from pydantic import BaseModel
 import os
 
 from database import SessionLocal, engine
-from models import Base, ValentineAnswer, Trip, Goal, PasswordCheck
+from models import Base, ValentineAnswer, Trip, Goal
 from schemas import (
-    ValentineAnswerCreate,
     TripCreate,
     GoalCreate,
 )
@@ -43,18 +43,18 @@ app.add_middleware(
 )
 
 
+
+
 def check_password(pw: str):
     if pw != SHARED_PASSWORD:
-        raise HTTPException(status_code=401, detail="Contraseña incorrecta, no eres ana paty")
-    
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
+class PasswordCheck(BaseModel):
+    password: str
 
-
-@app.post("/auth/password")
 def verify_password(payload: PasswordCheck):
     if payload.password != SHARED_PASSWORD:
         return {"success": False}
-
     return {"success": True}
 
 
@@ -82,14 +82,6 @@ def root():
     return {"message": "Backend is live"}
 
 
-@app.post("/valentine/answer")
-def save_answer(
-    payload: ValentineAnswerCreate,
-    db: Session = Depends(get_db),
-):
-    db.add(ValentineAnswer(answer=payload.answer))
-    db.commit()
-    return {"status": "saved"}
 
 
 @app.get("/trips")
