@@ -57,6 +57,11 @@ def verify_password(payload: PasswordCheck):
         return {"success": False}
     return {"success": True}
 
+@app.post("/auth/password")
+def verify_password(payload: PasswordCheck):
+    if payload.password != SHARED_PASSWORD:
+        return {"success": False}
+    return {"success": True}
 
 
 @app.get("/valentine/status")
