@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import os
 
 from database import SessionLocal, engine
-from models import Base, ValentineAnswer, Trip, Goal
+from models import Base, ValentineAnswer, Trip, Goal, PasswordCheck
 from schemas import (
     ValentineAnswerCreate,
     TripCreate,
@@ -45,7 +45,36 @@ app.add_middleware(
 
 def check_password(pw: str):
     if pw != SHARED_PASSWORD:
-        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta, no eres ana paty")
+    
+
+
+
+@app.post("/auth/password")
+def verify_password(payload: PasswordCheck):
+    if payload.password != SHARED_PASSWORD:
+        return {"success": False}
+
+    return {"success": True}
+
+
+
+@app.get("/valentine/status")
+def valentine_status(db: Session = Depends(get_db)):
+    yes_exists = (
+        db.query(ValentineAnswer)
+        .filter(ValentineAnswer.answer == True)
+        .first()
+        is not None
+    )
+
+    return {"answeredYes": yes_exists}
+
+@app.post("/valentine/yes")
+def save_yes(db: Session = Depends(get_db)):
+    db.add(ValentineAnswer(answer=True))
+    db.commit()
+    return {"status": "saved"}
 
 
 @app.get("/")
