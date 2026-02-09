@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime
 from datetime import datetime
-from project14_backend.database import Base
+from database import Base
 
 
 class ValentineAnswer(Base):

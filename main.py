@@ -1,23 +1,31 @@
-
-from fastapi import FastAPI, Depends, HTTPException, Header, Request
+from fastapi import FastAPI, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
-import os
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+import os
 
-from project14_backend.database import SessionLocal, engine
+from database import SessionLocal, engine
 from models import Base, ValentineAnswer, Trip, Goal
+from schemas import (
+    ValentineAnswerCreate,
+    TripCreate,
+    GoalCreate,
+)
 
 load_dotenv()
+SHARED_PASSWORD = os.getenv("SHARED_PASSWORD")
 
-SHARED_PASSWORD = os.get("SHARED_PASSWORD")
+if not SHARED_PASSWORD:
+    raise RuntimeError("SHARED_PASSWORD not set")
 
-app = FastAPI(title="project14 backend")
+app = FastAPI(
+    title="project14 backend",
+    version="1.0.0"
+)
 
-# Create tables
+
 Base.metadata.create_all(bind=engine)
 
-
-# -------- DB dependency --------
 def get_db():
     db = SessionLocal()
     try:
@@ -26,22 +34,18 @@ def get_db():
         db.close()
 
 
-# -------- CORS --------
-from fastapi.middleware.cors import CORSMiddleware
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # later replace with Vercel URL
+    allow_origins=["*"],  # tighten in prod
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# -------- Helper: password check --------
 def check_password(pw: str):
-    if not pw or pw != SHARED_PASSWORD:
-        raise HTTPException(status_code=401, detail="Contraseña incorrecta ahh")
+    if pw != SHARED_PASSWORD:
+        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
 
 
 @app.get("/")
@@ -50,70 +54,73 @@ def root():
 
 
 @app.post("/valentine/answer")
-async def save_answer(request: Request, db: Session = Depends(get_db)):
-    body = await request.json()
-    answer = body.get("answer")
-
-    if not answer:
-        raise HTTPException(status_code=400, detail="respuesta")
-
-    db.add(ValentineAnswer(answer=answer))
+def save_answer(
+    payload: ValentineAnswerCreate,
+    db: Session = Depends(get_db),
+):
+    db.add(ValentineAnswer(answer=payload.answer))
     db.commit()
-
     return {"status": "saved"}
 
 
-# -------- Trips --------
 @app.get("/trips")
 def get_trips(db: Session = Depends(get_db)):
     return db.query(Trip).order_by(Trip.created_at.desc()).all()
 
-
 @app.post("/trips")
-async def add_trip(
-    request: Request,
-    x_shared_password: str = Header(None),
+def add_trip(
+    trip: TripCreate,
+    x_shared_password: str = Header(...),
     db: Session = Depends(get_db),
 ):
     check_password(x_shared_password)
 
-    body = await request.json()
-
-    trip = Trip(
-        destination=body.get("destination"),
-        description=body.get("description"),
-        planned_year=body.get("planned_year"),
+    new_trip = Trip(
+        destination=trip.destination,
+        description=trip.description,
+        planned_year=trip.planned_year,
     )
 
-    db.add(trip)
+    db.add(new_trip)
     db.commit()
+    db.refresh(new_trip)
 
-    return {"status": "Viaje added"}
+    return new_trip
 
 
-# -------- Goals --------
 @app.get("/goals")
 def get_goals(db: Session = Depends(get_db)):
     return db.query(Goal).order_by(Goal.created_at.desc()).all()
 
 
+
 @app.post("/goals")
-async def add_goal(
-    request: Request,
-    x_shared_password: str = Header(None),
+def add_goal(
+    goal: GoalCreate,
+    x_shared_password: str = Header(...),
     db: Session = Depends(get_db),
 ):
     check_password(x_shared_password)
 
-    body = await request.json()
-
-    goal = Goal(
-        title=body.get("title"),
-        description=body.get("description"),
-        status=body.get("status", "planned"),
+    new_goal = Goal(
+        title=goal.title,
+        description=goal.description,
+        status=goal.status,
     )
 
-    db.add(goal)
+    db.add(new_goal)
     db.commit()
+    db.refresh(new_goal)
 
-    return {"status": "Goal added"}
+    return new_goal
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", 8000)),
+        reload=True,  # local only
+    )
